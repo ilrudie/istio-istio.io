@@ -349,29 +349,36 @@ command terminated with exit code 56
 
 ### Layer 7 authorization policy
 
-Using the Kubernetes Gateway API, you can deploy a {{< gloss "waypoint" >}}waypoint proxy{{< /gloss >}} for the `productpage` service that uses the `bookinfo-productpage` service account. Any traffic going to the `productpage` service will be mediated, enforced and observed by the Layer 7 (L7) proxy.
+Using the Kubernetes Gateway API, you can deploy a {{< gloss "waypoint" >}}waypoint proxy{{< /gloss >}} for the `productpage` service.
 
-Deploy a waypoint proxy for the `productpage` service:
+Deploy a waypoint proxy to be used by the `productpage` service:
 
 {{< text bash >}}
-$ istioctl x waypoint apply --service-account bookinfo-productpage --wait
-waypoint default/bookinfo-productpage applied
+$ istioctl x waypoint apply --wait
+waypoint default/namespace applied
 {{< /text >}}
 
 View the `productpage` waypoint proxy status; you should see the details of the gateway
 resource with `Programmed` status:
 
 {{< text bash >}}
-$ kubectl get gtw bookinfo-productpage -o yaml
+$ kubectl get gtw namespace -o yaml
 ...
 status:
   conditions:
   - lastTransitionTime: "2023-02-24T03:22:43Z"
-    message: Resource programmed, assigned to service(s) bookinfo-productpage-istio-waypoint.default.svc.cluster.local:15008
+    message: Resource programmed, assigned to service(s) waypoint-istio-waypoint.default.svc.cluster.local:15008
     observedGeneration: 1
     reason: Programmed
     status: "True"
     type: Programmed
+{{< /text >}}
+
+Now we can tell istio we want to use our new waypoint for the productpage service by adding the `istio.io/use-waytpoint` annotation to our service and specifying the new waypoint.
+
+{{< text bash >}}
+$ kubectl annotate svc productpage istio.io/use-waypoint=namespace
+service/productpage annotate
 {{< /text >}}
 
 Update your `AuthorizationPolicy` to explicitly allow the `sleep` and gateway service accounts to `GET` the `productpage` service, but perform no other operations:
@@ -387,7 +394,7 @@ spec:
   targetRef:
     kind: Gateway
     group: gateway.networking.k8s.io
-    name: bookinfo-productpage
+    name: namespace
   action: ALLOW
   rules:
   - from:
@@ -421,12 +428,7 @@ $ kubectl exec deploy/sleep -- curl -s http://productpage:9080/ | grep -o "<titl
 
 ## Control traffic {#control}
 
-Deploy a waypoint proxy for the `review` service, using the `bookinfo-review` service account, so that any traffic going to the `review` service will be mediated by the waypoint proxy.
-
-{{< text bash >}}
-$ istioctl x waypoint apply --service-account bookinfo-reviews --wait
-waypoint default/bookinfo-reviews applied
-{{< /text >}}
+We can use the same waypoint to control traffic to reviews by
 
 Configure traffic routing to send 90% of requests to `reviews` v1 and 10% to `reviews` v2:
 
